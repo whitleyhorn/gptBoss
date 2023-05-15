@@ -46,7 +46,7 @@ $inputForChatGPT = '';
 // If first msg, add instructions to the user input
 $chatGPTManager = new ChatGPTManager($app_type);
 if(count($chatChain->messages) === 0) {
-  $user_msg = $chatGPTManager->addUserInstructions($user_msg);
+  $user_msg = $chatGPTManager->addInstructions($user_msg);
   $inputForChatGPT = $user_msg;
 } else {
   // Prepend a summary of the prev messages to the new message
@@ -59,7 +59,7 @@ if(count($chatChain->messages) === 0) {
 
 // Save the chat chain
 $persistenceManager = new PersistenceManager();
-$persistenceManager->saveChatChain($chatChain);
+$persistenceManager->saveChatChain($chatChain, $db);
 
 // Send the input to ChatGPT API
 $chatGPTAPI = new ChatGPTAPI();
@@ -67,15 +67,15 @@ $requestBody = $chatGPTAPI->getRequestBody($inputForChatGPT);
 $response = $chatGPTAPI->sendRequest($requestBody);
 
 // Add user message to the chat chain
-$message = new Message($chatChain->id, "user", $user_msg, time());
+$message = new Message($chatChain->id, "user", $user_msg, time(), $branchIndex);
 $chatChain->messages[] = $message;
 
 // Add response to the chat chain
-$message = new Message($chatChain->id, "ChatGPT", $response, time());
+$message = new Message($chatChain->id, "ChatGPT", $response, time(), $branchIndex);
 $chatChain->messages[] = $message;
 
 // Update the chat chain
-$persistenceManager->saveChatChain($chatChain);
+$persistenceManager->saveChatChain($chatChain, $db);
 
 // Record usage metrics
 $usageTracker = new UsageTracker();
