@@ -19,6 +19,9 @@
         <label for="inquiry">Enter your inquiry:</label>
         <textarea id="inquiry" rows="4" cols="50"></textarea>
         <br/>
+        <label for="id">Enter your ID:</label>
+        <input type="number" id="id" name="id">
+        <br/>
         <button type="submit">Submit</button>
     </form>
     <div id="response-container">
@@ -27,4 +30,4 @@
     </div>
     <script src="app.js"></script>
 </body>
-</html> 
+</html>
