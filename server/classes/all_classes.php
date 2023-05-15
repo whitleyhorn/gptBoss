@@ -28,6 +28,7 @@ class ChatGPTManager {
 class ChatGPTAPI {
     // Methods
     public function sendRequest($request_body) {
+      return "This is a mock response from the chatGPT API";
       $ch = curl_init();
       curl_setopt($ch, CURLOPT_URL, 'https://api.openai.com/v1/chat/completions');
       curl_setopt($ch, CURLOPT_HTTPHEADER, array(
@@ -58,6 +59,7 @@ class ChatGPTAPI {
 
       return $outputs[0];
     }
+    
     public function getRequestBody($input){
       $request_body = array(
         'model' => 'gpt-3.5-turbo',
@@ -93,24 +95,24 @@ class AdditionalCapabilities {
 
 class PersistenceManager {
     // Methods
-    public function saveChatChain($chatChain, $pdo) {
+    public function saveChatChain($chatChain, $db) {
         foreach ($chatChain->messages as $message) {
             // Only insert new messages (with id set to null)
             if ($message->id === null) {
-                $message->id = $this->insertMessageIntoDatabase($message, $pdo);
+                $message->id = $this->insertMessageIntoDatabase($message, $db);
             }
         }
     }
 
-    public function loadChatChain($chatChainId, $pdo) {
+    public function loadChatChain($chatChainId, $db) {
         $chatChain = new ChatChain($chatChainId);
-        $chatChain->messages = $this->retrieveMessagesFromDatabase($chatChainId, $pdo);
+        $chatChain->messages = $this->retrieveMessagesFromDatabase($chatChainId, $db);
         return $chatChain;
     }
 
-    public function insertMessageIntoDatabase($message, $pdo) {
+    public function insertMessageIntoDatabase($message, $db) {
         $query = "INSERT INTO messages (chatChainId, sender, content, timestamp, branchIndex) VALUES (:chatChainId, :sender, :content, :timestamp, :branchIndex)";
-        $statement = $pdo->prepare($query);
+        $statement = $db->prepare($query);
         $statement->bindParam(':chatChainId', $message->chatChainId, PDO::PARAM_INT);
         $statement->bindParam(':sender', $message->sender, PDO::PARAM_STR);
         $statement->bindParam(':content', $message->content, PDO::PARAM_STR);
@@ -118,18 +120,18 @@ class PersistenceManager {
         $statement->bindParam(':branchIndex', $message->branchIndex, PDO::PARAM_INT);
         $statement->execute();
 
-        return $pdo->lastInsertId();
+        return $db->lastInsertId();
     }
 
-    public function retrieveMessagesFromDatabase($chatChainId, $pdo) {
+    public function retrieveMessagesFromDatabase($chatChainId, $db) {
         $query = "SELECT * FROM messages WHERE chatChainId = :chatChainId ORDER BY timestamp ASC";
-        $statement = $pdo->prepare($query);
+        $statement = $db->prepare($query);
         $statement->bindParam(':chatChainId', $chatChainId, PDO::PARAM_INT);
         $statement->execute();
 
         $messages = [];
         while ($row = $statement->fetch(PDO::FETCH_ASSOC)) {
-            $message = new Message($row['id'], $row['chatChainId'], $row['sender'], $row['content'], $row['timestamp']);
+            $message = new Message($row['id'], $row['chatChainId'], $row['sender'], $row['content'], $row['timestamp'], $row['branchIndex']);
             array_push($messages, $message);
         }
         return $messages;
@@ -189,7 +191,7 @@ class ChatChain {
         $totalSummary = '';
         $latestBranchIndex = end($this->messages)->branchIndex;
         $summaryLengthPerBranch = intval($maxSummaryLength / $latestBranchIndex);
-        $branches = messagesByBranch();
+        $branches = $this->messagesByBranch();
 
         foreach ($branches as $branchContent) {
             $branchSummary = $this->summarizeBranch($branchContent, $summaryLengthPerBranch);
@@ -212,7 +214,7 @@ class ChatChain {
       // TODO: Only use tokens not chars
       $numTokens = $maxLength / 4;
       $input = "Please summarize each message in the following conversation and return the conversation in the same format. Use approximately {$numTokens} tokens, and no more than {$numTokens} tokens. Conversations: " . $branchContent;
-      $requestBody = $chatGPTAPI->getRequestBody($inputForChatGPT);
+      $requestBody = $chatGPTAPI->getRequestBody($input);
       $response = $chatGPTAPI->sendRequest($requestBody);
       return $response;
     }
