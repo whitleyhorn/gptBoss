@@ -1,5 +1,10 @@
 <?php
-include_once("db.php");
+if (strpos($_SERVER['HTTP_HOST'], 'localhost') !== false) {
+  include_once("../../db.php");
+} else {
+  // uses environment variables
+  include_once("db.php");
+}
 include_once("functions/request_chatgpt.php");
 include_once("classes/all_classes.php");
 
@@ -29,9 +34,12 @@ if (strlen($user_msg) < 10 || strlen($user_msg) > 500) {
 // NOTE: 13000 characters is not exactly the token limit, it's intentionally smaller than it needs to be for now
 $tokenLimitChars = 13000;
 // Create a new chat chain for the user with 13000 max chars per branch
-$chatChain = new ChatChain($chat_id, $user_id, $tokenLimitChars);
-$chatChain->retrieveMessagesFromDatabase($db);
-$latestBranchIndex = end($chatChain->messages)->branchIndex;
+$chatChain = new ChatChain($chat_id, $user_id, $tokenLimitChars, $db);
+$persistenceManager = new PersistenceManager($chatChain, $db);
+$chatChain->messages = $persistenceManager->retrieveMessagesFromDatabase();
+$latestBranchIndex = (count($chatChain->messages) > 0) ? 
+  end($chatChain->messages)->branchIndex 
+  : 0;
 $branchIndex = $latestBranchIndex;
 
 // Check if a new branch should be started
@@ -57,9 +65,6 @@ if(count($chatChain->messages) === 0) {
   $inputForChatGPT = "I am going to send you a summary of a conversation between a user and chatGPT, with the final message from the user at the end. Please respond to that final message.";
 }
 
-// Save the chat chain
-$persistenceManager = new PersistenceManager();
-$persistenceManager->saveChatChain($chatChain, $db);
 
 // Send the input to ChatGPT API
 $chatGPTAPI = new ChatGPTAPI();
@@ -67,15 +72,15 @@ $requestBody = $chatGPTAPI->getRequestBody($inputForChatGPT);
 $response = $chatGPTAPI->sendRequest($requestBody);
 
 // Add user message to the chat chain
-$message = new Message($chatChain->id, "user", $user_msg, time(), $branchIndex);
+$message = new Message(null, $chatChain->id, "user", $user_msg, time(), $branchIndex);
 $chatChain->messages[] = $message;
 
 // Add response to the chat chain
-$message = new Message($chatChain->id, "ChatGPT", $response, time(), $branchIndex);
+$message = new Message(null, $chatChain->id, "ChatGPT", $response, time(), $branchIndex);
 $chatChain->messages[] = $message;
 
-// Update the chat chain
-$persistenceManager->saveChatChain($chatChain, $db);
+// Save the chat chain
+$persistenceManager->saveChatChain();
 
 // Record usage metrics
 $usageTracker = new UsageTracker();

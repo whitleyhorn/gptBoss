@@ -94,25 +94,28 @@ class AdditionalCapabilities {
 }
 
 class PersistenceManager {
+    // Properties
+    public $chatChain;
+    public $db;
+
+    public function __construct($chatChain, $db) {
+      $this->chatChain = $chatChain;
+      $this->db = $db;
+    }
+    
     // Methods
-    public function saveChatChain($chatChain, $db) {
-        foreach ($chatChain->messages as $message) {
+    public function saveChatChain() {
+        foreach ($this->chatChain->messages as $message) {
             // Only insert new messages (with id set to null)
             if ($message->id === null) {
-                $message->id = $this->insertMessageIntoDatabase($message, $db);
+                $message->id = $this->insertMessageIntoDatabase($message);
             }
         }
     }
 
-    public function loadChatChain($chatChainId, $db) {
-        $chatChain = new ChatChain($chatChainId);
-        $chatChain->messages = $this->retrieveMessagesFromDatabase($chatChainId, $db);
-        return $chatChain;
-    }
-
-    public function insertMessageIntoDatabase($message, $db) {
+    public function insertMessageIntoDatabase($message) {
         $query = "INSERT INTO messages (chatChainId, sender, content, timestamp, branchIndex) VALUES (:chatChainId, :sender, :content, :timestamp, :branchIndex)";
-        $statement = $db->prepare($query);
+        $statement = $this->db->prepare($query);
         $statement->bindParam(':chatChainId', $message->chatChainId, PDO::PARAM_INT);
         $statement->bindParam(':sender', $message->sender, PDO::PARAM_STR);
         $statement->bindParam(':content', $message->content, PDO::PARAM_STR);
@@ -120,13 +123,13 @@ class PersistenceManager {
         $statement->bindParam(':branchIndex', $message->branchIndex, PDO::PARAM_INT);
         $statement->execute();
 
-        return $db->lastInsertId();
+        return $this->db->lastInsertId();
     }
 
-    public function retrieveMessagesFromDatabase($chatChainId, $db) {
+    public function retrieveMessagesFromDatabase() {
         $query = "SELECT * FROM messages WHERE chatChainId = :chatChainId ORDER BY timestamp ASC";
-        $statement = $db->prepare($query);
-        $statement->bindParam(':chatChainId', $chatChainId, PDO::PARAM_INT);
+        $statement = $this->db->prepare($query);
+        $statement->bindParam(':chatChainId', $this->chatChain->id, PDO::PARAM_INT);
         $statement->execute();
 
         $messages = [];
@@ -187,10 +190,11 @@ class ChatChain {
         return ($charCount >= $this->branchChars);
     }
 
-    public function summarizeConversation($maxSummaryLength, $newMessage) {
+    public function prependSummary($maxSummaryLength, $newMessage) {
         $totalSummary = '';
         $latestBranchIndex = end($this->messages)->branchIndex;
-        $summaryLengthPerBranch = intval($maxSummaryLength / $latestBranchIndex);
+        $numBranches = $latestBranchIndex + 1;
+        $summaryLengthPerBranch = intval($maxSummaryLength / $numBranches);
         $branches = $this->messagesByBranch();
 
         foreach ($branches as $branchContent) {
@@ -224,7 +228,7 @@ class ChatChain {
 
 class Message {
     // Properties
-    public $id = null; // Set default value to null
+    public $id;
     public $chatChainId;
     public $sender;
     public $content;
@@ -232,7 +236,8 @@ class Message {
     public $branchIndex;
 
     // Constructor
-    public function __construct($chatChainId, $sender, $content, $timestamp, $branchIndex) {
+    public function __construct($id, $chatChainId, $sender, $content, $timestamp, $branchIndex) {
+        $this->id = $id;
         $this->chatChainId = $chatChainId;
         $this->sender = $sender;
         $this->content = $content;

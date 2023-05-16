@@ -22,6 +22,9 @@
         <label for="id">Enter your ID:</label>
         <input type="number" id="id" name="id">
         <br/>
+        <label for="chat-id">Enter your Chat ID:</label>
+        <input type="number" id="chat-id" name="chat-id">
+        <br/>
         <button type="submit">Submit</button>
     </form>
     <div id="response-container">
