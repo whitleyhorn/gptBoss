@@ -5,6 +5,7 @@ if (strpos($_SERVER['HTTP_HOST'], 'localhost') !== false) {
   // uses environment variables
   include_once("db.php");
 }
+$log_file = fopen("logs/handle_inquiry.txt", "w");
 include_once("functions/request_chatgpt.php");
 include_once("classes/all_classes.php");
 
@@ -61,8 +62,8 @@ if(count($chatChain->messages) === 0) {
   // NOTE: We subtract the new message length from $tokenLimitChars because we want to be able to send the context (summaries) plus the entire new message. 
   // We may need to add logic to summarize the new message as well if it's past a certain number of characters
   // Or we just enforce a particular character limit per message
-  $messageWithSummary = $chatChain->prependSummary(($tokenLimitChars - strlen($user_msg)), $user_msg);
-  $inputForChatGPT = "I am going to send you a summary of a conversation between a user and chatGPT, with the final message from the user at the end. Please respond to that final message.";
+  $messageWithSummary = $chatChain->prependSummary(($tokenLimitChars - strlen($user_msg)), $user_msg, $log_file);
+  $inputForChatGPT = "I am going to send you a summary of a conversation between a user and chatGPT, with the final message from the user at the end. Please respond to that final message. Summary: ${messageWithSummary}";
 }
 
 
@@ -80,13 +81,22 @@ $message = new Message(null, $chatChain->id, "ChatGPT", $response, time(), $bran
 $chatChain->messages[] = $message;
 
 // Save the chat chain
-$persistenceManager->saveChatChain();
+$persistenceManager->saveChatChain($log_file);
 
 // Record usage metrics
 $usageTracker = new UsageTracker();
 $usageTracker->recordMetrics($chatChain);
 
-echo json_encode(['result' => $response]);
+$history = array_map(function($message) {
+  return [
+    "from" => $message->sender,
+    "message" => $message->content,
+    "timestamp" => $message->timestamp,
+  ];
+}, $chatChain->messages);
+
+echo json_encode(['result' => $response, 'history' => $history]);
+fclose($log_file);
 
 // *****
 function validate_input($input, $name, $str_type = 'varchar') {

@@ -27,8 +27,7 @@ class ChatGPTManager {
 
 class ChatGPTAPI {
     // Methods
-    public function sendRequest($request_body) {
-      return "This is a mock response from the chatGPT API";
+    public function sendRequest($request_body, $log_file=null) {
       $ch = curl_init();
       curl_setopt($ch, CURLOPT_URL, 'https://api.openai.com/v1/chat/completions');
       curl_setopt($ch, CURLOPT_HTTPHEADER, array(
@@ -43,7 +42,6 @@ class ChatGPTAPI {
 
       // PARSE RESULTS
       $results = json_decode($response, true);
-
       // HANDLE ERROR
       if(isset($results['error'])) {
         $error_message = $results['error']['message'];
@@ -60,16 +58,15 @@ class ChatGPTAPI {
       return $outputs[0];
     }
     
-    public function getRequestBody($input){
+    public function getRequestBody($input, $systemRole = 'You are a helpful AI', $max_tokens = 3000, $temperature = 0.8){
       $request_body = array(
         'model' => 'gpt-3.5-turbo',
         'messages' => array(
-            // TODO: Modify the system role content based on app type
-            array('role' => 'system', 'content' => 'You are a helpful AI'),
+            array('role' => 'system', 'content' => $systemRole),
             array('role' => 'user', 'content' => $input),
         ),
-        'temperature' => 0.8,
-        'max_tokens' => 1500,
+        'temperature' => $temperature,
+        'max_tokens' => $max_tokens,
       );
 
       return $request_body;
@@ -104,9 +101,13 @@ class PersistenceManager {
     }
     
     // Methods
-    public function saveChatChain() {
+    public function saveChatChain($log_file=null) {
         foreach ($this->chatChain->messages as $message) {
             // Only insert new messages (with id set to null)
+            if($log_file) {
+              fwrite($log_file, "message var: \n");
+              fwrite($log_file, print_r($message, true));
+            }
             if ($message->id === null) {
                 $message->id = $this->insertMessageIntoDatabase($message);
             }
@@ -175,7 +176,6 @@ class ChatChain {
     public function shouldStartNewBranch($newMsgLength) {
         // Get the latest branch index
         $latestBranchIndex = end($this->messages)->branchIndex;
-
         // Count the characters in the messages from the latest branch
         $charCount = 0;
         foreach ($this->messages as $message) {
@@ -190,7 +190,7 @@ class ChatChain {
         return ($charCount >= $this->branchChars);
     }
 
-    public function prependSummary($maxSummaryLength, $newMessage) {
+    public function prependSummary($maxSummaryLength, $newMessage, $log_file) {
         $totalSummary = '';
         $latestBranchIndex = end($this->messages)->branchIndex;
         $numBranches = $latestBranchIndex + 1;
@@ -198,12 +198,13 @@ class ChatChain {
         $branches = $this->messagesByBranch();
 
         foreach ($branches as $branchContent) {
-            $branchSummary = $this->summarizeBranch($branchContent, $summaryLengthPerBranch);
+            $branchSummary = $this->summarizeBranch($branchContent, $summaryLengthPerBranch, $log_file);
             if(strlen($branchSummary) > $summaryLengthPerBranch){
               $branchSummary = substr($branchSummary, 0, $summaryLengthPerBranch);
             }
             $totalSummary .= $branchSummary;
         }
+
 
         // Combine the total summary with the new message
         $summaryWithNewMessage = $totalSummary . $newMessage;
@@ -211,15 +212,16 @@ class ChatChain {
         return $summaryWithNewMessage;
     }
 
-    private function summarizeBranch($branchContent, $maxLength) {
+    private function summarizeBranch($branchContent, $maxLength, $log_file) {
       // Send the input to ChatGPT API
       $chatGPTAPI = new ChatGPTAPI();
       // One token corresponds to roughly 4 characters
       // TODO: Only use tokens not chars
       $numTokens = $maxLength / 4;
-      $input = "Please summarize each message in the following conversation and return the conversation in the same format. Use approximately {$numTokens} tokens, and no more than {$numTokens} tokens. Conversations: " . $branchContent;
-      $requestBody = $chatGPTAPI->getRequestBody($input);
-      $response = $chatGPTAPI->sendRequest($requestBody);
+      if($numTokens > 3000) $numTokens = 3000;
+      $input = "Please summarize each message in the following conversation and return the conversation in the same format.  Conversation: " . $branchContent;
+      $requestBody = $chatGPTAPI->getRequestBody($input, 'You are a helpful AI that takes in conversations and summarizes them', $numTokens, 0.3);
+      $response = $chatGPTAPI->sendRequest($requestBody, $log_file);
       return $response;
     }
 

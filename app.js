@@ -3,7 +3,7 @@ const inquiryInput = document.getElementById("inquiry");
 const appTypeInput = document.getElementById("app-type");
 const idInput = document.getElementById("id");
 const chatIdInput = document.getElementById("chat-id");
-const responseElement = document.getElementById("response");
+const conversationListElement = document.getElementById("conversation-list");
 const apiEndpoint = "/server/handle-inquiry.php";
 
 form.addEventListener("submit", handleSubmit);
@@ -17,7 +17,7 @@ async function handleSubmit(event) {
   const { value: chat_id } = chatIdInput;
 
   if (!inquiry) {
-    responseElement.textContent = "Please enter an inquiry.";
+    alert("Please enter an inquiry");
     return;
   }
 
@@ -40,8 +40,13 @@ async function handleSubmit(event) {
       throw new Error(data.error);
     }
 
-    responseElement.textContent = data.result;
+    let historyHTML = "";
+    for (let msg of data.history) {
+      historyHTML += `<b>${msg.from}:</b> ${msg.message}<br/>`;
+    }
+
+    conversationListElement.innerHTML = historyHTML;
   } catch (error) {
-    responseElement.textContent = `Error: ${error.message}`;
+    alert("Error: " + error.message);
   }
 }

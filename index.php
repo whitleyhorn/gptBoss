@@ -27,9 +27,10 @@
         <br/>
         <button type="submit">Submit</button>
     </form>
-    <div id="response-container">
-        <h2>Response</h2>
-        <pre id="response"></pre>
+    <div id="conversation-container">
+        <h2>Conversation</h2>
+        <ul id="conversation-list">
+        </ul>
     </div>
     <script src="app.js"></script>
 </body>
