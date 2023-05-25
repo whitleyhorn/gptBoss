@@ -217,7 +217,7 @@ class ChatChain {
       $chatGPTAPI = new ChatGPTAPI();
       // One token corresponds to roughly 4 characters
       // TODO: Only use tokens not chars
-      $numTokens = $maxLength / 4;
+      $numTokens = round($maxLength / 4);
       if($numTokens > 3000) $numTokens = 3000;
       $input = "Please summarize each message in the following conversation and return the conversation in the same format.  Conversation: " . $branchContent;
       $requestBody = $chatGPTAPI->getRequestBody($input, 'You are a helpful AI that takes in conversations and summarizes them', $numTokens, 0.3);

@@ -26,15 +26,15 @@ validate_input($app_type, "app_type");
 validate_input($user_id, "user_id", "numeric");
 validate_input($chat_id, "chat_id", "numeric");
 
-if (strlen($user_msg) < 10 || strlen($user_msg) > 500) {
+if (strlen($user_msg) < 10 || strlen($user_msg) > 10000) {
   header('HTTP/1.1 400 Bad Request');
   header('Content-Type: application/json; charset=UTF-8');
-  die(json_encode(array('error' => 'Input length should be between 10 and 500 characters.')));
+  die(json_encode(array('error' => 'Input length should be between 10 and 10000 characters.')));
 }
 
-// NOTE: 13000 characters is not exactly the token limit, it's intentionally smaller than it needs to be for now
-$tokenLimitChars = 13000;
-// Create a new chat chain for the user with 13000 max chars per branch
+// NOTE: 9000 characters is not exactly the token limit, it's intentionally smaller than it needs to be for now
+$tokenLimitChars = 9000;
+// Create a new chat chain for the user with 9000 max chars per branch
 $chatChain = new ChatChain($chat_id, $user_id, $tokenLimitChars, $db);
 $persistenceManager = new PersistenceManager($chatChain, $db);
 $chatChain->messages = $persistenceManager->retrieveMessagesFromDatabase();
