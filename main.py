@@ -1,4 +1,3 @@
-import sys
 from flask import Flask, request, jsonify, render_template
 from langchain import OpenAI, LLMChain, PromptTemplate
 from langchain.chains import ConversationChain
@@ -143,5 +142,5 @@ def index():
     return render_template('index.html')
 
 if __name__ == '__main__':
-    app.run()
+    app.run(debug=True, port=os.getenv("PORT", default=5000))
 
