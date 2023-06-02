@@ -1,14 +1,9 @@
 import sys
 from flask import Flask, request, jsonify, render_template
-from langchain.prompts import (
-    ChatPromptTemplate,
-    MessagesPlaceholder,
-    SystemMessagePromptTemplate,
-    HumanMessagePromptTemplate
-)
+from langchain import OpenAI, LLMChain, PromptTemplate
 from langchain.chains import ConversationChain
 from langchain.chat_models import ChatOpenAI
-from langchain.memory import ConversationSummaryMemory, ChatMessageHistory
+from langchain.memory import ConversationBufferMemory, ConversationSummaryMemory, ChatMessageHistory
 from langchain.schema import (
     AIMessage,
     HumanMessage,
@@ -99,25 +94,38 @@ def chat():
     if get_api_key() is None or get_api_key() == "":
         return jsonify({"error": "OpenAI API key is not set"}), 500
 
+    llm = OpenAI(temperature=0)
     history = ChatMessageHistory()
     loaded_messages = load_conversation(user_id, app_type)
+
+    memory = ConversationBufferMemory(memory_key="chat_history")
     for msg in loaded_messages:
         if msg.type == 'human':
-            history.add_user_message(msg.content)
+            memory.chat_memory.add_user_message(msg.content)
         elif msg.type == 'ai':
-            history.add_ai_message(msg.content)
+            memory.chat_memory.add_ai_message(msg.content)
         elif msg.type == 'system':
-            history.add_system_message(msg.content)
+            memory.chat_memory.add_system_message(msg.content)
 
-    llm = ChatOpenAI(temperature=0)
-    memory = ConversationSummaryMemory.from_messages(llm=llm, chat_memory=history)
-    conversation = ConversationChain(
-        memory=memory, llm=llm, verbose=True
+    template = """You are an AI chatbot helping a human to find a lawyer. Your job is to collect specific information sequentially. Begin by asking for the person's first name, followed by the last name, address, phone number, case practice area, and finally a brief description of their case. It's essential that each piece of information is fully obtained before proceeding to the next. Carefully review the chat history to ensure you have collected each piece of information completely. If there's any missing or incomplete data, make sure to ask for it. For instance, if the person has provided their first name but not their last name, your next question should request the last name.
+    {chat_history}
+    Human: {human_input}
+    Chatbot:"""
+
+    prompt = PromptTemplate(
+        input_variables=["chat_history", "human_input"],
+        template=template
     )
 
-    output = conversation.predict(input=user_input)
+    llm_chain = LLMChain(
+        llm=OpenAI(),
+        prompt=prompt,
+        verbose=True,
+        memory=memory,
+    )
+    output = llm_chain.predict(human_input=user_input)
 
-    messages = conversation.memory.chat_memory.messages
+    messages = llm_chain.memory.chat_memory.messages
 
     print('messages')
     print(messages)
