@@ -8,3 +8,4 @@ Werkzeug==1.0.1
 langchain==0.0.188
 python-dotenv==1.0.0
 mysql-connector-python==8.0.33
+openai=0.27.7
